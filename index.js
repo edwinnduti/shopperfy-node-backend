@@ -150,6 +150,32 @@ app.get('/query-status', async (req, res) => {
   }
 });
 
+// webhook url
+app.post('/webhook', (req, res) => {
+  // Check if the request has a Content-Type header of 'application/json'
+  const contentType = req.headers['content-type'];
+  if (!contentType || !contentType.includes('application/json')) {
+    // If not, return a 415 Unsupported Media Type error
+    return res.status(415).json({
+      error: 'Unsupported Content-Type. Server requires application/json.'
+    });
+  }
+
+  // 1. "Pick the data" from the request body.
+  const receivedData = req.body;
+
+  // Log the received data to the console for debugging
+  console.log('Webhook received data:');
+  console.log(receivedData);
+
+  // 2. "Return it" by sending a JSON response.
+  // The client will get a 200 OK status.
+  res.status(200).json({
+    message: "Data received successfully!",
+    data: receivedData
+  });
+});
+
 
 // --- Server Start ---
 app.listen(PORT, () => {
