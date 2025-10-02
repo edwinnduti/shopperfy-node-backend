@@ -19,6 +19,10 @@ const clientSecretTZN = "TGRmo983xTSJQ2SwZNzL3E2P8VX8N6UK";
 const clientIDDRC = "dduzwvlgz0ncl1ljcxowns0xcbea20jo";
 const clientSecretDRC = "TN5qiQ2VY3vCmROXzcg8nie58vbBklGb";
 
+// In-memory refund store
+// Structure: { transactionId: { refunds: [ {item, amount, reason, ThirdPartyConversationID, status} ] } }
+const refundsStore = {};
+
 const getCredentialsBasedOnMarket = (country) => {
   if (country === "TZA" || country === "TZN") {
     return {
@@ -155,7 +159,7 @@ app.put('/update-transaction', async (req, res) => {
   console.log("Received update-transaction payload:", payload);
 
   // Get credentials
-  let {clientID, clientSecret} = getCredentialsBasedOnMarket();
+  let {clientID, clientSecret} = getCredentialsBasedOnMarket(payload.input_Country);
 
   try {
     const accessToken = await getAccessToken(clientID, clientSecret);
@@ -195,7 +199,7 @@ app.get('/query-status', async (req, res) => {
   Object.keys(queryParams).forEach(key => url.searchParams.append(key, queryParams[key]));
 
   // Get credentials
-  let {clientID, clientSecret} = getCredentialsBasedOnMarket();
+  let {clientID, clientSecret} = getCredentialsBasedOnMarket(queryParams.input_Country);
 
   try {
     const accessToken = await getAccessToken(clientID, clientSecret);
@@ -244,6 +248,98 @@ app.post('/webhook', (req, res) => {
   });
 });
 
+// 1. Partial Refund API
+app.put('/refund', async (req, res) => {
+  const externalAPIURL = "https://uat.openapi.m-pesa.com:19050/openapi/ipg/v3/psp/intReturnFunds/";
+  const payload = req.body;
+  const { input_Country, input_TransactionID, item, reason } = payload;
+
+  if (!input_TransactionID) {
+    return res.status(400).json({ error: "input_TransactionID is required" });
+  }
+
+  // Get credentials for market
+  let {clientID, clientSecret} = getCredentialsBasedOnMarket(input_Country);
+
+  try {
+    const accessToken = await getAccessToken(clientID, clientSecret);
+
+    const response = await fetch(externalAPIURL, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Origin': '*',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const responseBody = await response.json();
+    console.log(`Refund API responded with status ${response.status} and body:`, responseBody);
+
+    // Save refund in memory
+    if (!refundsStore[input_TransactionID]) {
+      refundsStore[input_TransactionID] = { refunds: [] };
+    }
+
+    refundsStore[input_TransactionID].refunds.push({
+      item: item || "Unknown Item",
+      amount: payload.input_ReversalAmount,
+      reason: reason || "No reason provided",
+      ThirdPartyConversationID: payload.input_ThirdPartyConversationID,
+      status: responseBody.output_ResponseCode === "INS-GAR-0" ? "SUCCESS" : "FAILED"
+    });
+
+    res.status(response.status).json(responseBody);
+  } catch (error) {
+    console.error(`Refund API request failed: ${error.message}`);
+    res.status(502).json({ error: `Refund API request failed: ${error.message}` });
+  }
+});
+
+// 2. Query Refund Status API
+app.put('/query-refund', async (req, res) => {
+  const externalAPIURL = "https://uat.openapi.m-pesa.com:19050/openapi/ipg/v3/psp/intRefundQuery/";
+  const payload = req.body;
+  const { input_Country } = payload;
+
+  // Get credentials
+  let {clientID, clientSecret} = getCredentialsBasedOnMarket(input_Country);
+
+  try {
+    const accessToken = await getAccessToken(clientID, clientSecret);
+
+    const response = await fetch(externalAPIURL, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Origin': '*',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const responseBody = await response.json();
+    console.log(`Refund Query API responded with status ${response.status} and body:`, responseBody);
+
+    res.status(response.status).json(responseBody);
+  } catch (error) {
+    console.error(`Refund Query API request failed: ${error.message}`);
+    res.status(502).json({ error: `Refund Query API request failed: ${error.message}` });
+  }
+});
+
+// 3. Local endpoint to view in-memory refund history
+app.get('/refunds/:transactionId', (req, res) => {
+  const { transactionId } = req.params;
+  const refunds = refundsStore[transactionId];
+
+  if (!refunds) {
+    return res.status(404).json({ error: "No refunds found for this transaction ID" });
+  }
+
+  res.json(refunds);
+});
 
 // --- Server Start ---
 app.listen(PORT, () => {
