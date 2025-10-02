@@ -18,11 +18,6 @@ const clientSecretTZN = "TGRmo983xTSJQ2SwZNzL3E2P8VX8N6UK";
 const clientIDDRC = "dduzwvlgz0ncl1ljcxowns0xcbea20jo";
 const clientSecretDRC = "TN5qiQ2VY3vCmROXzcg8nie58vbBklGb";
 
-let credentials = {
-  clientID: "",
-  clientSecret: ""
-};
-
 const getCredentialsBasedOnMarket = (country) => {
   if (country === "TZA" || country === "TZN") {
     return {
@@ -39,10 +34,14 @@ const getCredentialsBasedOnMarket = (country) => {
 };
 
 // --- Middleware ---
+const allowedOrigin = process.env.NODE_ENV === 'production' 
+  ? 'https://shopperfy.vercel.app' 
+  : 'http://localhost:8080'
+
 // Replaces negroni.Classic() and gorilla/handlers.CORS()
 app.use(express.json()); // Allows the server to parse JSON bodies
 app.use(cors({
-  origin: '*',
+  origin: allowedOrigin,
   methods: ['GET', 'HEAD', 'POST', 'PUT', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -88,7 +87,7 @@ const getAccessToken = async (clientID, clientSecret) => {
 // --- Route Handlers ---
 
 // Replaces handlePayment
-app.post('/process-payment', async (req, res) => {
+app.post('/process-payment-single', async (req, res) => {
   const externalAPIURL = "https://uat.openapiportal.m-pesa.com/vpp/api/v1/vodapartner/payments/";
   const payload = req.body;
 
@@ -112,7 +111,7 @@ app.post('/process-payment', async (req, res) => {
 });
 
 // Replaces handlePayment Multi stage
-app.post('/process-payment', async (req, res) => {
+app.post('/process-payment-multi', async (req, res) => {
   const externalAPIURL = "https://uat.openapiportal.m-pesa.com/vpp/api/v1/vodapartner/paymentsMultistage/";
   const payload = req.body;
 
