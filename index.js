@@ -10,8 +10,33 @@ const { URLSearchParams } = require('url');
 const app = express();
 const PORT = process.env.PORT || 8090;
 
-const clientID = "zk2uwmsriqj2hhgygqvbv6w0nlhde4c6";
-const clientSecret = "TGRmo983xTSJQ2SwZNzL3E2P8VX8N6UK";
+// TZN
+const clientIDTZN = "zk2uwmsriqj2hhgygqvbv6w0nlhde4c6";
+const clientSecretTZN = "TGRmo983xTSJQ2SwZNzL3E2P8VX8N6UK";
+
+// DRC
+const clientIDDRC = "dduzwvlgz0ncl1ljcxowns0xcbea20jo";
+const clientSecretDRC = "TN5qiQ2VY3vCmROXzcg8nie58vbBklGb";
+
+let credentials = {
+  clientID: "",
+  clientSecret: ""
+};
+
+const getCredentialsBasedOnMarket = (country) => {
+  if (country === "TZA" || country === "TZN") {
+    return {
+      clientID: clientIDTZN, 
+      clientSecret: clientSecretTZN
+    };
+  }
+  if (country === "COD" || country === "DRC") {
+    return {
+      clientID: clientIDDRC, 
+      clientSecret: clientSecretDRC
+    };
+  }
+};
 
 // --- Middleware ---
 // Replaces negroni.Classic() and gorilla/handlers.CORS()
@@ -29,7 +54,7 @@ const truncatedToken = (accessToken) => {
 };
 
 // getAccessToken makes a POST request to get an access token.
-const getAccessToken = async () => {
+const getAccessToken = async (clientID, clientSecret) => {
   const url = "https://uat.openapi.m-pesa.com:19050/openapi/ipg/v3/psp/auth/";
 
   const params = new URLSearchParams();
@@ -64,6 +89,30 @@ const getAccessToken = async () => {
 
 // Replaces handlePayment
 app.post('/process-payment', async (req, res) => {
+  const externalAPIURL = "https://uat.openapiportal.m-pesa.com/vpp/api/v1/vodapartner/payments/";
+  const payload = req.body;
+
+  console.log("Received payload:", payload);
+
+  try {
+    const response = await fetch(externalAPIURL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const responseBody = await response.json();
+    console.log(`External API responded with status ${response.status} and body:`, responseBody);
+
+    res.status(response.status).json(responseBody);
+  } catch (error) {
+    console.error(`External API request failed: ${error.message}`);
+    res.status(502).json({ error: `External API request failed: ${error.message}` });
+  }
+});
+
+// Replaces handlePayment Multi stage
+app.post('/process-payment', async (req, res) => {
   const externalAPIURL = "https://uat.openapiportal.m-pesa.com/vpp/api/v1/vodapartner/paymentsMultistage/";
   const payload = req.body;
 
@@ -90,10 +139,13 @@ app.post('/process-payment', async (req, res) => {
 app.put('/update-transaction', async (req, res) => {
   const externalAPIURL = "https://uat.openapi.m-pesa.com:19050/openapi/ipg/v3/psp/intUpdateTransactionStatus/";
   const payload = req.body;
-  console.log("Received payload:", payload);
+  console.log("Received update-transaction payload:", payload);
+
+  // Get credentials
+  let {clientID, clientSecret} = getCredentialsBasedOnMarket();
 
   try {
-    const accessToken = await getAccessToken();
+    const accessToken = await getAccessToken(clientID, clientSecret);
 
     const response = await fetch(externalAPIURL, {
       method: 'PUT',
@@ -129,8 +181,11 @@ app.get('/query-status', async (req, res) => {
   const url = new URL(externalAPIURL);
   Object.keys(queryParams).forEach(key => url.searchParams.append(key, queryParams[key]));
 
+  // Get credentials
+  let {clientID, clientSecret} = getCredentialsBasedOnMarket();
+
   try {
-    const accessToken = await getAccessToken();
+    const accessToken = await getAccessToken(clientID, clientSecret);
 
     const response = await fetch(url, {
       method: 'GET',
