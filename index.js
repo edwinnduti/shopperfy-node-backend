@@ -8,6 +8,7 @@ const { URLSearchParams } = require('url');
 
 // --- Configuration and Environment Variables ---
 const app = express();
+app.use(express.json());
 const PORT = process.env.PORT || 8090;
 
 // TZN
