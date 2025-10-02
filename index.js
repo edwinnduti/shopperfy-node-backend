@@ -37,7 +37,7 @@ const getCredentialsBasedOnMarket = (country) => {
 const allowedOrigins = [
   'http://localhost:8080',
   'https://shopperfy.vercel.app',
-  'https://uat.openapiportal.m-pesa.com/'
+  'https://uat.openapiportal.m-pesa.com'
 ];
 
 app.use(cors({
