@@ -42,19 +42,20 @@ const allowedOrigins = [
 ];
 
 app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl)
-    if (!origin) return callback(null, true);
+  // origin: function (origin, callback) {
+  //   // Allow requests with no origin (like mobile apps or curl)
+  //   if (!origin) return callback(null, true);
     
-    // Check if the requesting origin is in the allowed list
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
+  //   // Check if the requesting origin is in the allowed list
+  //   if (allowedOrigins.includes(origin)) {
+  //     return callback(null, true);
+  //   }
     
-    // Block if the origin is not allowed
-    const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-    return callback(new Error(msg), false);
-  },
+  //   // Block if the origin is not allowed
+  //   const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+  //   return callback(new Error(msg), false);
+  // },
+  origin: '*',
   methods: ['GET', 'HEAD', 'POST', 'PUT', 'OPTIONS'],
   allowedHeaders: ['Content-Type']
 }));
