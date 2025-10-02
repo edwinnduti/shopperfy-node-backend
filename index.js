@@ -33,17 +33,27 @@ const getCredentialsBasedOnMarket = (country) => {
   }
 };
 
-// --- Middleware ---
-const allowedOrigin = process.env.NODE_ENV === 'production' 
-  ? 'https://shopperfy.vercel.app' 
-  : 'http://localhost:8080'
+const allowedOrigins = [
+  'http://localhost:8080',
+  'https://shopperfy.vercel.app'
+];
 
-// Replaces negroni.Classic() and gorilla/handlers.CORS()
-app.use(express.json()); // Allows the server to parse JSON bodies
 app.use(cors({
-  origin: allowedOrigin,
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    
+    // Check if the requesting origin is in the allowed list
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // Block if the origin is not allowed
+    const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+    return callback(new Error(msg), false);
+  },
   methods: ['GET', 'HEAD', 'POST', 'PUT', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type']
 }));
 
 // --- Helper Functions ---
