@@ -5,6 +5,7 @@ const express = require('express');
 const cors = require('cors');
 //onst fetch = require('node-fetch');
 const { URLSearchParams } = require('url');
+const { SHARE_ENV } = require('worker_threads');
 
 // --- Configuration and Environment Variables ---
 const app = express();
@@ -44,6 +45,21 @@ const allowedOrigins = [
   'https://shopperfy.vercel.app',
   'https://uat.openapiportal.m-pesa.com'
 ];
+
+const getBothShortCodes = (params) => {
+  if (params.input_Country === "TZA" || params.input_Country === "TZN") {
+    return {
+      shortCode: "223344", 
+      virtualShortCode: "123456"
+    };
+  }
+  if (params.input_Country === "COD" || params.input_Country === "DRC") {
+    return {
+      shortCode: "1455", 
+      virtualShortCode: "159754"
+    };
+  }
+};
 
 app.use(cors({
   // origin: function (origin, callback) {
@@ -188,6 +204,11 @@ app.put('/update-transaction', async (req, res) => {
 app.get('/query-status', async (req, res) => {
   const externalAPIURL = "https://uat.openapi.m-pesa.com:19050/openapi/ipg/v3/psp/intQTS/";
   const queryParams = req.query;
+
+  const {shortCode, virtualShortCode} = getBothShortCodes(queryParams);
+
+  queryParams.input_VirtualPSPOrAquirerShortCode = virtualShortCode;
+  queryParams.input_OrganisationShortCode = shortCode;
 
   // Basic validation
   if (!queryParams.input_QueryReference) {
